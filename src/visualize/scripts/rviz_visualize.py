@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-import sys
 import time
 
 import numpy as np
 import rclpy
+from rclpy.duration import Duration
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rclpy.time import Time
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
+from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
-
-from visualization_msgs.msg import Marker, MarkerArray
+from visualization_msgs.msg import Marker
 
 
 class RvizVisualizer(Node):
@@ -26,6 +27,14 @@ class RvizVisualizer(Node):
         self.joint_state_pub = self.create_publisher(
             JointState, '/visualize/robot_joint_states', 10
         )
+        self.marker_pub = self.create_publisher(Marker, '/visualize/wrist_marker', 10)
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.base_frame = 'visualize/base_link'
+        self.wrist_frame = 'visualize/wrist_3_link'
+        self.marker_frame = 'visualize/base_link'
+        self.logged_tf_warning = False
+        self.tf_startup_grace_steps = 20
         self.joint_name = [
             'shoulder_pan_joint',
             'shoulder_lift_joint',
@@ -39,6 +48,10 @@ class RvizVisualizer(Node):
         self.step = 0
         self.get_logger().info(
             'Publishing JointState on /visualize/robot_joint_states for 100 seconds.'
+        )
+        self.get_logger().info(
+            'Publishing Marker on /visualize/wrist_marker using TF from '
+            'visualize/base_link to visualize/wrist_3_link.'
         )
 
     def publish_robot_joint_states(self, joints_pos, joints_name):
@@ -54,8 +67,45 @@ class RvizVisualizer(Node):
     def publish_marker(self):
         # use lookup_transform to get transform from visualize/wrist_3_link to visualize/base_link
         # publish a Marker type message
+        try:
+            wrist_transform = self.tf_buffer.lookup_transform(
+                self.base_frame,
+                self.wrist_frame,
+                Time(),
+                timeout=Duration(seconds=0.2),
+            )
+        except TransformException as ex:
+            if not self.logged_tf_warning and self.step > self.tf_startup_grace_steps:
+                self.get_logger().warn(
+                    f'Cannot lookup transform {self.base_frame} <- {self.wrist_frame}: {ex}'
+                )
+                self.logged_tf_warning = True
+            return
 
-        pass
+        self.logged_tf_warning = False
+        marker_msg = Marker()
+        marker_msg.header.frame_id = self.marker_frame
+        marker_msg.header.stamp = self.get_clock().now().to_msg()
+        marker_msg.ns = 'wrist_marker'
+        marker_msg.id = 0
+        marker_msg.type = Marker.CUBE
+        marker_msg.action = Marker.ADD
+
+        marker_msg.pose.position.x = wrist_transform.transform.translation.x
+        marker_msg.pose.position.y = wrist_transform.transform.translation.y
+        marker_msg.pose.position.z = wrist_transform.transform.translation.z
+        marker_msg.pose.orientation = wrist_transform.transform.rotation
+
+        marker_msg.scale.x = 0.18
+        marker_msg.scale.y = 0.03
+        marker_msg.scale.z = 0.03
+
+        marker_msg.color.a = 1.0
+        marker_msg.color.r = 1.0
+        marker_msg.color.g = 0.3
+        marker_msg.color.b = 0.1
+
+        self.marker_pub.publish(marker_msg)
 
     def on_timer(self):
         if self.step < self.max_steps:

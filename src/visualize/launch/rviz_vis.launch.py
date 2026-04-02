@@ -43,7 +43,7 @@ def generate_launch_description():
                             value_type=str,
                         )
                     },
-                    {"frame_prefix": "/visualize/"},
+                    {"frame_prefix": "visualize/"},
                 ],
                 remappings=[("/joint_states", "joint_states")],
             ),

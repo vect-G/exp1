@@ -18,6 +18,10 @@ class RvizVisualizer(Node):
     def __init__(self):
         super().__init__('rviz_visualizer')
 
+        self.publish_period_sec = 0.1
+        self.publish_duration_sec = 100.0
+        self.max_steps = int(self.publish_duration_sec / self.publish_period_sec)
+
         # define a publisher to publish JointState message
         self.joint_state_pub = self.create_publisher(
             JointState, '/visualize/robot_joint_states', 10
@@ -31,8 +35,11 @@ class RvizVisualizer(Node):
             'wrist_3_joint',
         ]
 
-        self.timer = self.create_timer(0.1, self.on_timer)
+        self.timer = self.create_timer(self.publish_period_sec, self.on_timer)
         self.step = 0
+        self.get_logger().info(
+            'Publishing JointState on /visualize/robot_joint_states for 100 seconds.'
+        )
 
     def publish_robot_joint_states(self, joints_pos, joints_name):
         # publish a JointState type message
@@ -51,8 +58,8 @@ class RvizVisualizer(Node):
         pass
 
     def on_timer(self):
-        if self.step < 100:
-            t = self.step * 0.1
+        if self.step < self.max_steps:
+            t = self.step * self.publish_period_sec
             joint_pos = np.array(
                 [
                     0.6 * np.sin(t),
@@ -66,6 +73,8 @@ class RvizVisualizer(Node):
 
             self.publish_robot_joint_states(joint_pos, self.joint_name)
             self.publish_marker()
+        elif self.step == self.max_steps:
+            self.get_logger().info('Finished JointState publishing after 100 seconds.')
         self.step += 1
 
 

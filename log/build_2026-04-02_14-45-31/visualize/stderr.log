@@ -1,6 +1,0 @@
-[31mCMake Error at cmake_install.cmake:112 (file):
-  file INSTALL cannot find
-  "/home/wl/exp1_ws/src/visualize/scripts/rviz_visualize.py": No such file or
-  directory.
-
-[0m

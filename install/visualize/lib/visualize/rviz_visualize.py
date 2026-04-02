@@ -4,6 +4,7 @@ import time
 
 import numpy as np
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
@@ -75,7 +76,8 @@ if __name__ == "__main__":
     time.sleep(1)
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
 
-    rclpy.shutdown()
+    if rclpy.ok():
+        rclpy.shutdown()
